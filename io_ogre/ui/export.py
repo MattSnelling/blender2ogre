@@ -24,9 +24,9 @@ def auto_register(register):
     yield OP_ogre_export
 
     if register:
-        bpy.types.INFO_MT_file_export.append(menu_func)
+        bpy.types.TOPBAR_MT_file_export.append(menu_func)
     else:
-        bpy.types.INFO_MT_file_export.remove(menu_func)
+        bpy.types.TOPBAR_MT_file_export.remove(menu_func)
 
     
 
@@ -44,10 +44,6 @@ class _OgreCommonExport_(object):
         if context.active_object and context.mode != 'EDIT_MESH':
             return True
 
-    def __init__(self):
-        # check that converter is setup
-        self.converter = detect_converter_type()
-
     def invoke(self, context, event):
 
         # update the interface with the config values
@@ -58,6 +54,9 @@ class _OgreCommonExport_(object):
 
         wm = context.window_manager
         fs = wm.fileselect_add(self)
+
+        # check that converter is setup
+        self.converter = detect_converter_type()
 
         return {'RUNNING_MODAL'}
 
@@ -207,10 +206,6 @@ class _OgreCommonExport_(object):
         name="Shape Animation",
         description="export shape animations - updates the .mesh file",
         default=config.get('SHAPE_ANIM'))
-    EX_SHAPE_NORMALS = BoolProperty(
-        name="Shape Normals",
-        description="export normals in shape animations - updates the .mesh file",
-        default=config.get('SHAPE_NORMALS'))
     EX_TRIM_BONE_WEIGHTS = FloatProperty(
         name="Trim Weights",
         description="ignore bone weights below this value (Ogre supports 4 bones per vertex)",

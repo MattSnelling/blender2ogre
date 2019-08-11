@@ -1,4 +1,6 @@
-import bpy, mathutils, os, getpass, math
+import bpy, os, getpass
+import mathutils
+import math
 from os.path import join
 from .. import util
 from .. import config
@@ -39,7 +41,7 @@ def dot_scene(path, scene_name=None):
             continue
         if not config.get("EXPORT_HIDDEN") and ob.hide:
             continue
-        if config.get("SELONLY") and not ob.select:
+        if config.get("SELONLY") and not ob.select_get:
             if ob.type == 'CAMERA' and config.get("FORCE_CAMERA"):
                 pass
             elif ob.type == 'LAMP' and config.get("FORCE_LAMPS"):
@@ -249,27 +251,27 @@ def _mesh_entity_helper(doc, ob, o):
     o.appendChild(user)
 
     # # extended format - BGE Physics ##
-    _property_helper(doc, user, 'mass', ob.game.mass)
-    _property_helper(doc, user, 'mass_radius', ob.game.radius)
-    _property_helper(doc, user, 'physics_type', ob.game.physics_type)
-    _property_helper(doc, user, 'actor', ob.game.use_actor)
-    _property_helper(doc, user, 'ghost', ob.game.use_ghost)
-    _property_helper(doc, user, 'velocity_min', ob.game.velocity_min)
-    _property_helper(doc, user, 'velocity_max', ob.game.velocity_max)
-    _property_helper(doc, user, 'lock_trans_x', ob.game.lock_location_x)
-    _property_helper(doc, user, 'lock_trans_y', ob.game.lock_location_y)
-    _property_helper(doc, user, 'lock_trans_z', ob.game.lock_location_z)
-    _property_helper(doc, user, 'lock_rot_x', ob.game.lock_rotation_x)
-    _property_helper(doc, user, 'lock_rot_y', ob.game.lock_rotation_y)
-    _property_helper(doc, user, 'lock_rot_z', ob.game.lock_rotation_z)
-    _property_helper(doc, user, 'anisotropic_friction', ob.game.use_anisotropic_friction)
-    x, y, z = ob.game.friction_coefficients
-    _property_helper(doc, user, 'friction_x', x)
-    _property_helper(doc, user, 'friction_y', y)
-    _property_helper(doc, user, 'friction_z', z)
-    _property_helper(doc, user, 'damping_trans', ob.game.damping)
-    _property_helper(doc, user, 'damping_rot', ob.game.rotation_damping)
-    _property_helper(doc, user, 'inertia_tensor', ob.game.form_factor)
+    #_property_helper(doc, user, 'mass', ob.game.mass)
+    #_property_helper(doc, user, 'mass_radius', ob.game.radius)
+    #_property_helper(doc, user, 'physics_type', ob.game.physics_type)
+    #_property_helper(doc, user, 'actor', ob.game.use_actor)
+    #_property_helper(doc, user, 'ghost', ob.game.use_ghost)
+    #_property_helper(doc, user, 'velocity_min', ob.game.velocity_min)
+    #_property_helper(doc, user, 'velocity_max', ob.game.velocity_max)
+    #_property_helper(doc, user, 'lock_trans_x', ob.game.lock_location_x)
+    #_property_helper(doc, user, 'lock_trans_y', ob.game.lock_location_y)
+    #_property_helper(doc, user, 'lock_trans_z', ob.game.lock_location_z)
+    #_property_helper(doc, user, 'lock_rot_x', ob.game.lock_rotation_x)
+    #_property_helper(doc, user, 'lock_rot_y', ob.game.lock_rotation_y)
+    #_property_helper(doc, user, 'lock_rot_z', ob.game.lock_rotation_z)
+    #_property_helper(doc, user, 'anisotropic_friction', ob.game.use_anisotropic_friction)
+    #x, y, z = ob.game.friction_coefficients
+    #_property_helper(doc, user, 'friction_x', x)
+    #_property_helper(doc, user, 'friction_y', y)
+    #_property_helper(doc, user, 'friction_z', z)
+    #_property_helper(doc, user, 'damping_trans', ob.game.damping)
+    #_property_helper(doc, user, 'damping_rot', ob.game.rotation_damping)
+    #_property_helper(doc, user, 'inertia_tensor', ob.game.form_factor)
 
     mesh = ob.data
     # custom user props
@@ -313,9 +315,9 @@ def _ogre_node_helper( doc, ob, prefix='', pos=None, rot=None, scl=None ):
         s.setAttribute('y', '%6f'%y)
         s.setAttribute('z', '%6f'%z)
     else:        # scale is different in Ogre from blender - rotation is removed
-        ri = mat.to_quaternion().inverted().to_matrix()
-        scale = ri.to_4x4() * mat
-        v = swap( scale.to_scale() )
+        ri = mat.to_quaternion().inverted()
+        scale = ri @ mat.to_quaternion()
+        v = swap( scale.to_matrix().to_scale() )
         x=abs(v.x); y=abs(v.y); z=abs(v.z)
         s.setAttribute('x', '%6f'%x)
         s.setAttribute('y', '%6f'%y)
@@ -358,13 +360,13 @@ def ogre_document(materials):
     # Environ settings
     world = bpy.context.scene.world
     if world: # multiple scenes - other scenes may not have a world
-        _c = [ ('colourAmbient', world.ambient_color),
-               ('colourBackground', world.horizon_color)]
+        _c = [ ('colourAmbient', world.color),
+               ('colourBackground', world.color)]
         for ctag, color in _c:
             a = doc.createElement(ctag); environ.appendChild( a )
-            a.setAttribute('r', '%s'%color.r)
-            a.setAttribute('g', '%s'%color.g)
-            a.setAttribute('b', '%s'%color.b)
+            a.setAttribute('r', '%s'%color[0])
+            a.setAttribute('g', '%s'%color[1])
+            a.setAttribute('b', '%s'%color[2])
 
     if world and world.mist_settings.use_mist:
         a = doc.createElement('fog'); environ.appendChild( a )
@@ -393,9 +395,9 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
     xmlparent.appendChild(o)
 
     # Custom user props
-    if len(ob.items()) + len(ob.game.properties) > 0:
-        user = doc.createElement('userData')
-        o.appendChild(user)
+    #if len(ob.items()) + len(ob.game.properties) > 0:
+    #    user = doc.createElement('userData')
+    #    o.appendChild(user)
 
     for prop in ob.items():
         propname, propvalue = prop
@@ -403,29 +405,29 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
             _property_helper(doc, user, propname, propvalue)
 
     # Custom user props from BGE props by Mind Calamity
-    for prop in ob.game.properties:
-        _property_helper(doc, user, prop.name, prop.value)
+    #for prop in ob.game.properties:
+    #    _property_helper(doc, user, prop.name, prop.value)
 
     # BGE subset
-    if len(ob.game.sensors) + len(ob.game.actuators) > 0:
-        game = doc.createElement('game')
-        o.appendChild( game )
-        sens = doc.createElement('sensors')
-        game.appendChild( sens )
-        acts = doc.createElement('actuators')
-        game.appendChild( acts )
-        for sen in ob.game.sensors:
-            sens.appendChild( WrapSensor(sen).xml(doc) )
-        for act in ob.game.actuators:
-            acts.appendChild( WrapActuator(act).xml(doc) )
+    #if len(ob.game.sensors) + len(ob.game.actuators) > 0:
+    #    game = doc.createElement('game')
+    #    o.appendChild( game )
+    #    sens = doc.createElement('sensors')
+    #    game.appendChild( sens )
+    #    acts = doc.createElement('actuators')
+    #    game.appendChild( acts )
+    #    for sen in ob.game.sensors:
+    #        sens.appendChild( WrapSensor(sen).xml(doc) )
+    #    for act in ob.game.actuators:
+    #        acts.appendChild( WrapActuator(act).xml(doc) )
 
     if ob.type == 'MESH':
         # ob.data.tessfaces is empty. always until the following call
-        ob.data.update(calc_tessface=True)
+        ob.data.update(calc_loop_triangles=True)
         # if it has no faces at all, the object itself will not be exported, BUT 
         # it might have children
 
-    if ob.type == 'MESH' and len(ob.data.tessfaces):
+    if ob.type == 'MESH' and len(ob.data.polygons):
         collisionFile = None
         collisionPrim = None
         if ob.data.name in mesh_collision_prims:
@@ -439,18 +441,18 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         e.setAttribute('meshFile', '%s%s.mesh' %(prefix,clean_object_name(ob.data.name)) )
 
         if not collisionPrim and not collisionFile:
-            if ob.game.use_collision_bounds:
-                collisionPrim = ob.game.collision_bounds_type.lower()
-                mesh_collision_prims[ ob.data.name ] = collisionPrim
-            else:
-                for child in ob.children:
-                    if child.subcollision and child.name.startswith('DECIMATE'):
-                        collisionFile = '%s_collision_%s.mesh' %(prefix,ob.data.name)
-                        break
-                if collisionFile:
-                    mesh_collision_files[ ob.data.name ] = collisionFile
-                    mesh.dot_mesh(child, target_path, force_name='%s_collision_%s' % (prefix,ob.data.name) )
-                    skeleton.dot_skeleton(child, target_path)
+            #if ob.game.use_collision_bounds:
+            #    collisionPrim = ob.game.collision_bounds_type.lower()
+            #    mesh_collision_prims[ ob.data.name ] = collisionPrim
+            #else:
+            for child in ob.children:
+                if child.subcollision and child.name.startswith('DECIMATE'):
+                    collisionFile = '%s_collision_%s.mesh' %(prefix,ob.data.name)
+                    break
+            if collisionFile:
+                mesh_collision_files[ ob.data.name ] = collisionFile
+                mesh.dot_mesh(child, target_path, force_name='%s_collision_%s' % (prefix,ob.data.name) )
+                skeleton.dot_skeleton(child, target_path)
 
         if collisionPrim:
             e.setAttribute('collisionPrim', collisionPrim )

@@ -37,7 +37,6 @@ _CONFIG_DEFAULTS_ALL = {
     'TOUCH_TEXTURES' : True,
     'ARM_ANIM' : True,
     'SHAPE_ANIM' : True,
-    'SHAPE_NORMALS' : True,
     'ARRAY' : True,
     'MATERIALS' : True,
     'DDS_MIPS' : 16,
@@ -58,7 +57,7 @@ _CONFIG_DEFAULTS_ALL = {
     'interface_toggle': False,
     'optimizeVertexBuffersForShaders' : True,
     'optimizeVertexBuffersForShadersOptions' : 'puqs',
-    'EXPORT_ENABLE_LOGGING' : False,
+    'EXPORT_ENABLE_LOGGING' : True,
     'MESH_TOOL_EXPORT_VERSION' : 'v2'
 }
 
@@ -69,7 +68,7 @@ _CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT MESH_
     ships Ogre cmd line tools to ease the setup steps for end users. '''
 
 _CONFIG_DEFAULTS_WINDOWS = {
-    'OGRETOOLS_XML_CONVERTER' : 'C:\\OgreCommandLineTools\\OgreXmlConverter.exe',
+    'OGRETOOLS_XML_CONVERTER' : 'D:\\Downloads\\ogre-sdk-1.12.1-vc15-x64\\bin\\OgreXmlConverter.exe',
     'OGRETOOLS_MESH_MAGICK' : 'C:\\OgreCommandLineTools\\MeshMagick.exe',
     'TUNDRA_ROOT' : 'C:\\Tundra2',
     'MESH_PREVIEWER' : 'C:\\OgreMeshy\\Ogre Meshy.exe',
@@ -203,7 +202,7 @@ def save_config():
 
 def update_from_addon_preference(context):
 
-    addon_preferences = context.user_preferences.addons["io_ogre"].preferences
+    addon_preferences = context.preferences.addons["io_ogre"].preferences
     
     for key in _CONFIG_TAGS_:
         addon_pref_value = getattr(addon_preferences,key,None)

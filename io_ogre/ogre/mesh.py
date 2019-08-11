@@ -1,6 +1,4 @@
 import os, time, sys, logging
-import bmesh
-import mathutils
 from ..report import Report
 from ..util import *
 from ..xml import *
@@ -36,10 +34,10 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
     # blender per default does not calculate these. when querying the quads/tris 
     # of the object blender would crash if calc_tessface was not updated
-    ob.data.update(calc_tessface=True)
+    ob.data.update(calc_loop_triangles=True)
 
     Report.meshes.append( obj_name )
-    Report.faces += len( ob.data.tessfaces )
+    Report.faces += len( ob.data.polygons )
     Report.orig_vertices += len( ob.data.vertices )
 
     cleanup = False
@@ -80,16 +78,16 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 'positions':'true',
                 'normals':'true',
                 'colours_diffuse' : str(bool( mesh.vertex_colors )),
-                'texture_coords' : '%s' % len(mesh.uv_textures) if mesh.uv_textures.active else '0'
+                'texture_coords' : '%s' % len(mesh.face_maps) if mesh.face_maps.active else '0'
         })
 
         # Vertex colors, note that you can define a vertex color
         # material. see 'vertex_color_materials' below!
         vcolors = None
         vcolors_alpha = None
-        if len( mesh.tessface_vertex_colors ):
-            vcolors = mesh.tessface_vertex_colors[0]
-            for bloc in mesh.tessface_vertex_colors:
+        if len( mesh.vertex_colors ):
+            vcolors = mesh.vertex_colors[0]
+            for bloc in mesh.uv_layers:
                 if bloc.name.lower().startswith('alpha'):
                     vcolors_alpha = bloc; break
 
@@ -123,28 +121,19 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         # Textures
         dotextures = False
         uvcache = [] # should get a little speed boost by this cache
-        if mesh.tessface_uv_textures.active:
+        if mesh.uv_layers.active:
             dotextures = True
-            for layer in mesh.tessface_uv_textures:
-                uvs = []; uvcache.append( uvs ) # layer contains: name, active, data
-                for uvface in layer.data:
-                    uvs.append( (uvface.uv1, uvface.uv2, uvface.uv3, uvface.uv4) )
+            for layer in mesh.uv_layers:
+                uvs = []
+                #uvcache.append( uvs ) # layer contains: name, active, data
+                #for uvface in layer.data:
+                    #uvs.append( (uvface.uv1, uvface.uv2, uvface.uv3, uvface.uv4) )
 
         shared_vertices = {}
         _remap_verts_ = []
-        _remap_normals_ = []
-        _face_indices_ = []
         numverts = 0
-        bm = None
 
-        if mesh.has_custom_normals:
-            mesh.calc_normals_split()
-            # Create bmesh to help obtain custom vertex normals
-            bm = bmesh.new() 
-            bm.from_mesh(mesh)
-            bm.verts.ensure_lookup_table()
-
-        for F in mesh.tessfaces:
+        for F in mesh.polygons:
             smooth = F.use_smooth
             faces = material_faces[ F.material_index ]
             # Ogre only supports triangles
@@ -166,18 +155,9 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                     v = mesh.vertices[ idx ]
 
                     if smooth:
-                        if mesh.has_custom_normals:
-                            n = mathutils.Vector()
-                            for loop in bm.verts[idx].link_loops:
-                                n += mesh.loops[loop.index].normal
-                            n.normalize()
-                            nx,ny,nz = swap( n )
-                        else:
-                            nx,ny,nz = swap( v.normal ) # fixed june 17th 2011
-                            n = mathutils.Vector( [nx, ny, nz] )
+                        nx,ny,nz = swap( v.normal ) # fixed june 17th 2011
                     else:
                         nx,ny,nz = swap( F.normal )
-                        n = mathutils.Vector( [nx, ny, nz] )
 
                     export_vertex_color, color_tuple = \
                             extract_vertex_color(vcolors, vcolors_alpha, F, idx)
@@ -219,8 +199,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
                     numverts += 1
                     _remap_verts_.append( v )
-                    _remap_normals_.append( n )
-                    _face_indices_.append( F.index )
 
                     x,y,z = swap(v.co)        # xz-y is correct!
 
@@ -550,48 +528,19 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                         'target' : 'mesh'
                 })
 
-                snormals = None
-                
-                if config.get('SHAPE_NORMALS'):
-                    if smooth:
-                        snormals = skey.normals_vertex_get()
-                    else:
-                        snormals = skey.normals_polygon_get()
-
                 for vidx, v in enumerate(_remap_verts_):
                     pv = skey.data[ v.index ]
                     x,y,z = swap( pv.co - v.co )
-
-                    if config.get('SHAPE_NORMALS'):
-                        n = _remap_normals_[ vidx ]
-                        if smooth:
-                            pn = mathutils.Vector( [snormals[ v.index * 3 ], snormals[ v.index * 3 + 1], snormals[ v.index * 3 + 2]] )
-                        else:
-                            vindex = _face_indices_[ vidx ]
-                            pn = mathutils.Vector( [snormals[ vindex * 3 ], snormals[ vindex * 3 + 1], snormals[ vindex * 3 + 2]] )
-                        nx,ny,nz = swap( pn - n )
-
                     #for i,p in enumerate( skey.data ):
                     #x,y,z = p.co - ob.data.vertices[i].co
                     #x,y,z = swap( ob.data.vertices[i].co - p.co )
                     #if x==.0 and y==.0 and z==.0: continue        # the older exporter optimized this way, is it safe?
-                    if config.get('SHAPE_NORMALS'):
-                        doc.leaf_tag('poseoffset', {
-                                'x' : '%6f' % x,
-                                'y' : '%6f' % y,
-                                'z' : '%6f' % z,
-                                'nx' : '%6f' % nx,
-                                'ny' : '%6f' % ny,
-                                'nz' : '%6f' % nz,
-                                'index' : str(vidx)     # is this required?
-                        })
-                    else:
-                        doc.leaf_tag('poseoffset', {
-                                'x' : '%6f' % x,
-                                'y' : '%6f' % y,
-                                'z' : '%6f' % z,
-                                'index' : str(vidx)     # is this required?
-                        })
+                    doc.leaf_tag('poseoffset', {
+                            'x' : '%6f' % x,
+                            'y' : '%6f' % y,
+                            'z' : '%6f' % z,
+                            'index' : str(vidx)     # is this required?
+                    })
                 doc.end_tag('pose')
             doc.end_tag('poses')
 
@@ -648,8 +597,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             del copy
             del mesh
         del _remap_verts_
-        del _remap_normals_
-        del _face_indices_
         del uvcache
         doc.close() # reported by Reyn
         f.close()

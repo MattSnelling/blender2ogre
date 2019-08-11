@@ -283,9 +283,9 @@ def is_strictly_simple_terrain( ob ):
 
 def get_image_textures( mat ):
     r = []
-    for s in mat.texture_slots:
-        if s and s.texture != None and s.texture.type == 'IMAGE':
-            r.append( s )
+    #for s in mat.texture_slots:
+    #    if s and s.texture != None and s.texture.type == 'IMAGE':
+    #        r.append( s )
     return r
 
 def texture_image_path(tex):
@@ -435,8 +435,8 @@ def merge( objects ):
 
 def get_merge_group( ob, prefix='merge.' ):
     m = []
-    for grp in ob.users_group:
-        if grp.name.lower().startswith(prefix): m.append( grp )
+    #for grp in ob.users_group:
+    #    if grp.name.lower().startswith(prefix): m.append( grp )
     if len(m)==1:
         #if ob.data.users != 1:
         #    print( 'WARNING: an instance can not be in a merge group' )
